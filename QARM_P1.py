@@ -105,6 +105,15 @@ for col_name in df_TOT_RET.columns:
 df_returns = df_returns.iloc[1:]
 mean_returns = df_returns.mean()
 cov_matrix = df_returns.cov()
+
+df_returns = df_returns.fillna(df_returns.mean())
+
+# TEST COV_MATRIX
+eig_values, eig_vectors = np.linalg.eig(cov_matrix)
+if np.all(eig_values > 0):
+    print("La matrice est définie positive.")
+else:
+    print("La matrice n'est pas définie positive.")
 ########################################################################################################################
 """
 QUESTION 1.1
@@ -270,7 +279,7 @@ def negative_sharpe_ratio(w, m_returns, cov_mat, rf=0):
     return - (port_returns - rf) / port_std
 
 
-def max_sharpe_ratio(m_returns, cov_mat, rf=0, constraint_set=(0, 1)):
+def max_sharpe_ratio(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
     """Min negative Sharpe Ratio by altering the weights of the portfolio"""
     num_assets = len(m_returns)
     args = (m_returns, cov_mat, rf)
@@ -286,7 +295,7 @@ def portfolio_var(w, m_returns, cov_mat):
     return portfolio_perf(w, m_returns, cov_mat)[1]
 
 
-def min_var(m_returns, cov_mat, constraint_set=(0, 1)):
+def min_var(m_returns, cov_mat, constraint_set=(-1, 1)):
     """Min the portfolio variance by altering the weights/allocation of assets in the portfolio"""
     num_assets = len(m_returns)
     args = (m_returns, cov_mat)
@@ -316,7 +325,7 @@ def port_return(w, m_returns, cov_mat):
     return portfolio_perf(w, m_returns, cov_mat)[0]
 
 
-def efficient_optimization(m_returns, cov_mat, return_target, constraint_set=(0, 1)):
+def efficient_optimization(m_returns, cov_mat, return_target, constraint_set=(-1, 1)):
     """For each return, we want to optimise the portfolio for min variance"""
     num_assets = len(m_returns)
     args = (m_returns, cov_mat)
@@ -330,7 +339,7 @@ def efficient_optimization(m_returns, cov_mat, return_target, constraint_set=(0,
     return eff_opt
 
 
-def calculated_results(m_returns, cov_mat, rf=0, constraint_set=(0, 1)):
+def calculated_results(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
     """Read in mean, cov matrix, and other financial information
     Output, Max SR, Min Vol, efficient frontier"""
     # Max Sharpe Ratio Portfolio
@@ -362,7 +371,7 @@ def calculated_results(m_returns, cov_mat, rf=0, constraint_set=(0, 1)):
 # print(calculated_results(mean_returns, cov_matrix))
 
 
-def ef_graph(m_returns, cov_mat, rf=0, constraint_set=(0, 1)):
+def ef_graph(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
     """Return a graph ploting the min vol, max SR and efficient frontier"""
     max_sr_returns, max_sr_std, max_sr_allocation, min_vol_returns, min_vol_std, min_vol_allocation, \
         efficient_list, target_return = calculated_results(m_returns, cov_mat, rf, constraint_set)
