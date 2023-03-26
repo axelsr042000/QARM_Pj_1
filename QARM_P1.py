@@ -4,9 +4,9 @@ LOAD PACKAGES
 import numpy as np
 import pandas as pd
 import scipy.optimize as sc
+from scipy.stats import norm, t
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-import sco as sco
 import seaborn as sns
 
 
@@ -104,20 +104,20 @@ for col_name in df_TOT_RET.columns:
 
 df_returns = df_returns.iloc[1:]
 mean_returns = df_returns.mean()
+df_returns = df_returns.fillna(df_returns.mean())
 cov_matrix = df_returns.cov()
 
-df_returns = df_returns.fillna(df_returns.mean())
-
 # TEST COV_MATRIX
-eig_values, eig_vectors = np.linalg.eig(cov_matrix)
-if np.all(eig_values > 0):
-    print("La matrice est définie positive.")
-else:
-    print("La matrice n'est pas définie positive.")
+# determinant = print(np.linalg.det(cov_matrix))
+# eig_values, eig_vectors = np.linalg.eig(cov_matrix)
+# if np.all(eig_values > 0):
+#     print("La matrice est définie positive.")
+# else:
+#     print("La matrice n'est pas définie positive.")
 ########################################################################################################################
 """
 QUESTION 1.1
-"""
+
 # In[1.1]:
 
 # Create a table for all descriptive statistics of df_REVENUES
@@ -157,21 +157,21 @@ df_company_info = df_company_info.set_index(df_stats_returns.index)
 groups = df_company_info.groupby('GICSSector', group_keys=False)
 sector_dict = {name: group for name, group in groups}
 
-"""
-Here are the different sector :
 
-Communication Services
-Consumer Discretionary
-Consumer Staples
-Energy
-Financials
-Health Care
-Industrials
-Information Technology
-Materials
-Real Estate
-Utilities
-"""
+# ere are the different sector :
+
+# Communication Services
+# Consumer Discretionary
+# Consumer Staples
+# Energy
+# Financials
+# Health Care
+# Industrials
+# Information Technology
+# Materials
+# Real Estate
+# Utilities
+
 
 CSe_df = sector_dict['Communication Services']
 CD_df = sector_dict['Consumer Discretionary']
@@ -255,6 +255,7 @@ plt.legend()
 
 # Show the plot
 plt.show()
+"""
 ########################################################################################################################
 """
 QUESTION 1.2
@@ -356,7 +357,7 @@ def calculated_results(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
 
     # Efficient Frontier
     efficient_list = []
-    target_return = np.linspace(min_vol_returns, max_sr_returns, 40)
+    target_return = np.linspace(min_vol_returns, max_sr_returns, 10)
     for target in target_return:
         efficient_list.append(efficient_optimization(m_returns, cov_mat, target)["fun"])
 
@@ -370,9 +371,9 @@ def calculated_results(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
 # print(calculated_results(mean_returns, cov_matrix))
 # print(calculated_results(mean_returns, cov_matrix))
 
-
+"""
 def ef_graph(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
-    """Return a graph ploting the min vol, max SR and efficient frontier"""
+    # Return a graph ploting the min vol, max SR and efficient frontier
     max_sr_returns, max_sr_std, max_sr_allocation, min_vol_returns, min_vol_std, min_vol_allocation, \
         efficient_list, target_return = calculated_results(m_returns, cov_mat, rf, constraint_set)
 
@@ -421,10 +422,37 @@ def ef_graph(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
 
 
 ef_graph(mean_returns, cov_matrix)
+"""
+
+
+def ef_graph(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
+    """Return a graph ploting the min vol, max SR and efficient frontier"""
+    max_sr_returns, max_sr_std, max_sr_allocation, min_vol_returns, min_vol_std, min_vol_allocation, \
+        efficient_list, target_return = calculated_results(m_returns, cov_mat, rf, constraint_set)
+
+    # Max SR
+    plt.scatter(max_sr_std, max_sr_returns, color='red', s=100, edgecolors='black')
+
+    # Min Vol
+    plt.scatter(min_vol_std, min_vol_returns, color='green', s=100, edgecolors='black')
+
+    # Efficient Frontier
+    plt.plot([ef_std * 100 for ef_std in efficient_list], [target * 100 for target in target_return],
+             color='black', linestyle='-.', linewidth=2)
+
+    plt.title('Portfolio Optimization with the Efficient Frontier')
+    plt.xlabel('Annualized Volatility (%)')
+    plt.ylabel('Annualized Return (%)')
+    plt.legend(['Maximum Sharpe Ratio', 'Minimum Volatility', 'Efficient Frontier'], loc='best')
+
+    plt.show()
+
+
+ef_graph(mean_returns, cov_matrix)
 ########################################################################################################################
 """
 EFFICIENT FRONTIER METHOD 2 => SYSTEM RESOLUTION NEDD TO BE CHANGED IF WEIGHTS CONSTRAINTS
-"""
+
 mean_returns_np = mean_returns.values.reshape((-1, 1))
 # Convert dataframe in matrix numpy
 cov_matrix_np = cov_matrix.values
@@ -433,9 +461,6 @@ cov_matrix_inv = np.linalg.inv(cov_matrix_np)
 
 # Matrix column 1
 ones_matrix = np.ones((mean_returns_np.shape[0], 1))
-
-determinant = np.linalg.det(cov_matrix_inv)
-
 
 A = float(ones_matrix.T @ cov_matrix_inv @ mean_returns_np)
 B = float(mean_returns_np.T @ cov_matrix_inv @ mean_returns_np)
@@ -453,7 +478,7 @@ def portVar(w, cov_mat):
 
 
 efficient_list_std = []
-target_rtrns = np.linspace(mean_returns.min(), mean_returns.max(), 10)
+target_rtrns = np.linspace(0.01, 0.35, 10)
 for rtrns in target_rtrns:
     ret_0 = float((portVar(g, cov_matrix))**2)
     ret_1 = float((portVar(g + h, cov_matrix))**2)
@@ -462,7 +487,7 @@ for rtrns in target_rtrns:
     matrix_coef = np.array([[0, 0, 1], [1, 1, 1], [rtrns**2, rtrns, 1]])
     matrix_results = np.array([ret_0, ret_1, ret_target]).reshape((-1, 1))
     abc = np.linalg.solve(matrix_coef, matrix_results)  # abc donne les val de a, b et c pour coef vriance port
-    min_var_port_target_ret = float(abc[0] * rtrns**2 + abc[1] * rtrns + abc[2])
+    min_var_port_target_ret = float((abc[0] * rtrns**2 + abc[1] * rtrns + abc[2])*12)
     efficient_list_std.append(min_var_port_target_ret)
 
 
@@ -471,10 +496,11 @@ plt.scatter(efficient_list_std, target_rtrns)
 plt.xlabel('efficient_list_var')
 plt.ylabel('target_rtrns')
 plt.show()
+"""
 ########################################################################################################################
 """
 EFFICIENT FRONTIER METHOD 3
-"""
+
 
 
 def portfolio_variance(w, cov_mat):
@@ -501,7 +527,7 @@ weights = np.ones(mean_returns.shape[0]) / mean_returns.shape[0]
 
 # définition des bornes pour les poids
 # Vector of size number of assets, for each ones bounds is (0,1)
-bounds = tuple((0, 1) for i in range(mean_returns.shape[0]))
+bounds = tuple((-1, 1) for i in range(mean_returns.shape[0]))
 
 # définition de la contrainte de somme des poids
 constraint1 = {'type': 'eq', 'fun': constraint_sum}
@@ -520,7 +546,7 @@ for target_mean in mean_range:
     constraints = [constraint1, constraint2]
 
     # Résoudre l'optimisation sous contraintes pour trouver les poids optimaux
-    results = sco.minimize(portfolio_variance, weights, args=(cov_matrix,), method='SLSQP', bounds=bounds,
+    results = sc.minimize(portfolio_variance, weights, args=(cov_matrix,), method='SLSQP', bounds=bounds,
                            constraints=constraints)
 
     # Ajouter les résultats optimaux de la variance et de la moyenne aux listes
@@ -533,9 +559,136 @@ for target_mean in mean_range:
 # Tracer la frontière efficiente
 plt.plot(np.sqrt(variances), means)
 plt.scatter(np.sqrt(portVar), portMean)
-plt.ylim(0, max(portMean))
-plt.xlim(0, 0.35)
+plt.ylim(0, 0.6)
+plt.xlim(0, 0.12)
 plt.xlabel('Annualised Standard Deviation')
 plt.ylabel('Annualised Returns')
 plt.title('Efficient Frontier')
 plt.show()
+"""
+########################################################################################################################
+"""
+QUESTION 1.4
+"""
+# Weights concerning the minimum variance portfolio
+weights_min_var = min_var(mean_returns, cov_matrix)["x"]
+
+
+def marginal_contributions_risk(w, m_retunrs, cov_mat):
+    # Marginal contributions to risk
+    MCR = np.dot(cov_mat, w) / np.sqrt(np.dot(w.T, np.dot(cov_mat, w)))
+    # Retrieve variance of each asset from the covaraince matrix
+    std_devs = np.sqrt(np.diag(cov_mat))
+    # Covariance of each asset with the portfolio
+    cov_with_portfolio = np.zeros(len(w))
+    for i in range(len(w)):
+        cov_i = w[i] * std_devs[i]
+        for j in range(len(w)):
+            if j != i:
+                cov_i += w[j] * cov_mat.iloc[i, j]
+        cov_with_portfolio[i] = cov_i
+    # Marginal contributions to risk => what is different with MCR ?????
+    MCRi = cov_with_portfolio / min_var(m_retunrs, cov_mat)["fun"]
+
+    return MCR, MCRi
+
+
+print(marginal_contributions_risk(min_var(mean_returns, cov_matrix)["x"], mean_returns, cov_matrix))
+# test MCRi et MCR
+# test = cov_matrix.loc[cov_matrix.index != "STANLEY BLACK & DECKER", "MGIC INVESTMENT"]
+# test = cov_matrix.iloc[1:, 0]
+# test2 = weights_min_var[np.r_[0:2, 3:144]]
+# test2 = weights_min_var[1:]
+# print((weights_min_var[0]*std_devs[0] + np.dot(test, test2))
+#       /min_var(mean_returns, cov_matrix)["fun"])
+
+
+"""Global Minimum Portfolio"""
+# Global Minimum Variance Portfolio attributes the same marginal volatility to all the assets
+
+
+def GMP(m_returns, cov_mat):
+    # Inverse covariance matrix
+    cov_matrix_inv = np.linalg.inv(cov_mat)
+    # Matrix column 1
+    ones_matrix = np.ones(len(m_returns))
+
+    optimal_weights = np.dot(cov_matrix_inv, ones_matrix) / np.dot(ones_matrix.T, np.dot(cov_matrix_inv, ones_matrix))
+
+    GMP_perf = portfolio_perf(optimal_weights, m_returns, cov_mat)
+
+    return GMP_perf, optimal_weights
+
+
+print(GMP(mean_returns, cov_matrix))
+print(marginal_contributions_risk(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix))
+
+# VAR computed on returns directly
+alpha = 0.01
+VAR = portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[0] - norm.ppf(1 - alpha) * \
+      portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[1]
+
+
+def var_parametric(portreturn, portstd, distribution="normal", alpha=1, dof=6):
+    """Calculate the portfolio VaR given a distribution, with known parameters"""
+    if distribution == "normal":
+        VaR = portreturn - norm.ppf(1 - alpha / 100) * portstd
+    elif distribution == "t-distribution":
+        nu = dof
+        VaR = portreturn - np.sqrt((nu - 2) / nu) * t.ppf(1 - alpha / 100, nu) * portstd
+    else:
+        raise TypeError("Expected distribution to be normal or t-distributed")
+    return VaR
+
+
+# Expected ShortFall
+
+
+def cvar_parametric(portreturn, portstd, distribution="normal", alpha=1, dof=6):
+    """Calculate the portfolio CVaR given a distribution, with known parameters"""
+    if distribution == "normal":
+        CVaR = portreturn - (alpha / 100) ** -1 * norm.pdf(norm.ppf(alpha / 100)) * portstd
+    elif distribution == "t-distribution":
+        nu = dof
+        x_anu = t.ppf(alpha / 100, nu)
+        CVaR = portreturn - -1 / (alpha / 100) * (1 - nu) ** -1 * (nu - 2 + x_anu ** 2) * t.pdf(x_anu, nu) * portstd
+    else:
+        raise TypeError("Expected distribution to be normal or t-distributed")
+    return CVaR
+
+
+normVaR = var_parametric(portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[0],
+                         portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[1])
+normCVaR = cvar_parametric(portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[0],
+                           portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[1])
+tVaR = var_parametric(portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[0],
+                      portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[1], distribution="t-distribution")
+tCVaR = cvar_parametric(portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[0],
+                        portfolio_perf(GMP(mean_returns, cov_matrix)[1], mean_returns, cov_matrix)[1], distribution="t-distribution")
+
+print(normVaR)
+print(normCVaR)
+print(tVaR)
+print(tCVaR)
+
+
+# Max Drowdown
+df_returns_G_M_Port = df_returns * GMP(mean_returns, cov_matrix)[1]
+df_returns_G_M_Port = df_returns_G_M_Port.assign(Sum=df_returns_G_M_Port.sum(axis=1))
+
+# Tracer un graphique en courbes
+plt.plot(df_returns_G_M_Port.index, df_returns_G_M_Port['Sum'])
+
+# Définir les étiquettes des axes
+plt.xlabel('Dates')
+plt.ylabel('Somme des colonnes')
+
+# Afficher le graphique
+plt.show()
+
+
+max_data_stock = df_returns_G_M_Port["Sum"].rolling(window=len(df_returns_G_M_Port["Sum"]), min_periods=1).max()
+dd_stock = df_returns_G_M_Port["Sum"] / max_data_stock - 1
+MDD_stock = dd_stock.rolling(window=len(df_returns_G_M_Port["Sum"]), min_periods=1).min()
+print(MDD_stock.min()*100)
+
