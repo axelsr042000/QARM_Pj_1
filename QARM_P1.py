@@ -14,8 +14,7 @@ import seaborn as sns
 """
 PATH TO THE FILE
 """
-path_to_file = r'/Users/fredericsaintromain/Desktop/HEC_EPFL/Quantitative_Asset_and_Risk_Management/QARM_Pj_1' \
-               r'/Data/data.xlsx'
+path_to_file = '/home/itopie/Bureau/HEC Lausanne/QARM/QARM_Pj_1/Data/data.xlsx'
 ########################################################################################################################
 """
 OPEN DATA
@@ -102,10 +101,52 @@ for col_name in df_TOT_RET.columns:
         x1 = df_TOT_RET[col_name][i]
         df_returns[col_name][i] = simple_returns(x0, x1)
 
+
+# """DROP ASSETS WITH LESS THAN 6 YEARS OF RETURNS IN COMMUN WITH OTHER ASSETS"""
+# # Nombre minimum de mois de rendements en commun
+# min_months = 72
+#
+# # Liste pour stocker les noms des colonnes avec moins de 72 mois de rendements en commun
+# columns_to_drop = []
+#
+# # Boucle sur les colonnes du dataframe
+# for i, col1 in enumerate(df_returns.columns):
+#     # Compte le nombre de mois de rendements non-nuls pour la colonne i
+#     months_i = df_returns[col1].count()
+#     # Continue si la colonne i a au moins min_months mois de rendements non-nuls
+#     if months_i >= min_months:
+#         # Liste des dates pour lesquelles la colonne i a des rendements non-nuls
+#         dates_i = df_returns.index[df_returns[col1].notnull()].tolist()
+#         # Boucle sur les colonnes suivantes du dataframe
+#         for col2 in df_returns.columns[i+1:]:
+#             # Compte le nombre de mois de rendements non-nuls pour la colonne j
+#             months_j = df_returns[col2].count()
+#             # Continue si la colonne j a au moins min_months mois de rendements non-nuls
+#             if months_j >= min_months:
+#                 # Liste des dates pour lesquelles la colonne j a des rendements non-nuls
+#                 dates_j = df_returns.index[df_returns[col2].notnull()].tolist()
+#                 # Nombre de mois de rendements en commun
+#                 months_common = len(set(dates_i).intersection(set(dates_j)))
+#                 # Si le nombre de mois de rendements en commun est inférieur à min_months,
+#                 # ajouter les noms des colonnes à la liste columns_to_drop
+#                 if months_common < min_months:
+#                     columns_to_drop.append(col1)
+#                     columns_to_drop.append(col2)
+#
+# # Supprime les doublons de la liste des colonnes à dropper
+# columns_to_drop = list(set(columns_to_drop))
+
+# Affiche la liste des colonnes à dropper
+# print("Colonnes à dropper : ", columns_to_drop)
+# df_returns.drop(columns_to_drop, axis=1, inplace=True)
+
 df_returns = df_returns.iloc[1:]
+df_returns = df_returns.dropna(axis=1)
 mean_returns = df_returns.mean()
-df_returns = df_returns.fillna(df_returns.mean())
+# df_returns = df_returns.fillna(df_returns.mean())
 cov_matrix = df_returns.cov()
+# cov_matrix = df_returns.cov(min_periods=72)
+corr_matrix = df_returns.corr()
 
 # TEST COV_MATRIX
 # determinant = print(np.linalg.det(cov_matrix))
@@ -114,6 +155,20 @@ cov_matrix = df_returns.cov()
 #     print("La matrice est définie positive.")
 # else:
 #     print("La matrice n'est pas définie positive.")
+
+
+# tracer le graphique pour chaque actif
+for column in df_returns.columns:
+    plt.plot(df_returns.index, df_returns[column], label=column)
+
+# ajouter les titres et légendes
+plt.title('Rendements des actifs')
+plt.xlabel('Dates')
+plt.ylabel('Rendements')
+# plt.legend(loc='upper left')
+
+# afficher le graphique
+plt.show()
 ########################################################################################################################
 """
 QUESTION 1.1
@@ -449,6 +504,18 @@ def ef_graph(m_returns, cov_mat, rf=0, constraint_set=(-1, 1)):
 
 
 ef_graph(mean_returns, cov_matrix)
+
+
+# Autre moyen
+# w_alpha_min = (1 - (np.dot(np.ones(len(mean_returns)), np.dot(np.linalg.inv(cov_matrix), mean_returns))/1))
+# alpha_min = np.dot(np.linalg.inv(cov_matrix), np.ones(len(mean_returns))) /\
+#             np.dot(np.ones(len(mean_returns)), np.dot(np.linalg.inv(cov_matrix), np.ones(len(mean_returns))))
+# w_alpha_spec = (np.dot(np.ones(len(mean_returns)), np.dot(np.linalg.inv(cov_matrix), mean_returns))/1)
+# alpha_spec = np.dot(np.linalg.inv(cov_matrix), mean_returns) /\
+#             np.dot(np.ones(len(mean_returns)), np.dot(np.linalg.inv(cov_matrix), mean_returns))
+# weight_formule_cours = w_alpha_min * alpha_min + w_alpha_spec * alpha_spec
+#
+# portfolio_perf(weight_formule_cours, mean_returns, cov_matrix)
 ########################################################################################################################
 """
 EFFICIENT FRONTIER METHOD 2 => SYSTEM RESOLUTION NEDD TO BE CHANGED IF WEIGHTS CONSTRAINTS
@@ -567,6 +634,254 @@ plt.title('Efficient Frontier')
 plt.show()
 """
 ########################################################################################################################
+"""
+QUESTION 1.3
+RESAMPLING
+"""
+
+# Create empty tables
+num_samples = 10
+sample_means = []
+sample_covs = []
+sample_weights = []
+
+np.random.seed(10)
+for i in range(num_samples):
+    # Generate x samples
+    sample = np.random.multivariate_normal(mean_returns, cov_matrix, len(df_returns))
+    sample = pd.DataFrame(sample, columns=df_returns.columns, index=df_returns.index)
+
+    # Get mean and cov of samples
+    sample_mean_returns = sample.mean()
+    sample_cov = sample.cov(ddof=1)
+
+    # Add it to a list
+    sample_means.append(sample_mean_returns)
+    sample_covs.append(sample_cov)
+
+##########################
+"PLOT ALL GENERATED SAMPLES EFFICIENT FRONTIERS"
+
+
+def ef_sample_graph(samples_means, samples_covs, rf=0, constraint_set=(-1, 1), colors=None, linestyles=None):
+    plt.figure(figsize=(7, 5))
+    for i, (m_returns, cov_mat) in enumerate(zip(samples_means, samples_covs)):
+        max_sr_returns, max_sr_std, max_sr_allocation, min_vol_returns, min_vol_std, min_vol_allocation, \
+            efficient_list, target_return = calculated_results(m_returns, cov_mat, rf, constraint_set)
+
+        color = colors[i] if colors else None
+        linestyle = linestyles[i] if linestyles else None
+
+        # Max SR
+        plt.scatter(max_sr_std, max_sr_returns, color='red', s=100, edgecolors='black')
+
+        # Min Vol
+        plt.scatter(min_vol_std, min_vol_returns, color='green', s=100, edgecolors='black')
+
+        # Efficient Frontier
+        plt.plot([ef_std * 100 for ef_std in efficient_list], [target * 100 for target in target_return],
+                 color=color, linestyle=linestyle, linewidth=2)
+
+    plt.ylim(0, 60)
+    plt.xlim(0, 10)
+    plt.title('Sampled Portfolios Efficient Frontiers')
+    plt.xlabel('Annualized Volatility (%)')
+    plt.ylabel('Annualized Return (%)')
+    # plt.legend([' Maximum Sharpe Ratio', 'Minimum Volatility', 'Efficient Frontier'], loc='best')
+
+    plt.show()
+
+
+ef_sample_graph(sample_means, sample_covs)  # , colors=['blue', 'red'], linestyles=['-', '--']
+
+
+# Hint: How to find weights for a targeted return portfolio of 20%: efficient_optimization(mean_returns,
+# cov_matrix, 0.2)["x"]
+
+# Stocks optimal weights of historical returns for m portfolios
+def stock_weights(mean, cov):
+    # Get weights of x portfolio equally spaced
+    # Find the minimum variance portfolio weights
+    min_var_portfolio = min_var(mean, cov)
+    min_var_weights = min_var_portfolio['x']
+
+    # Find the maximum Sharpe ratio portfolio weights
+    max_sharpe_portfolio = max_sharpe_ratio(mean, cov)
+    max_sharpe_weights = max_sharpe_portfolio['x']
+
+    # Find the weights of the other x-2 equally spaced portfolios
+    m_portfolios = 10  # checked and no differences between 10 and 30 portfolios
+    target_returns = np.linspace(port_return(min_var_weights, mean, cov),
+                                 port_return(max_sharpe_weights, mean, cov),
+                                 m_portfolios)[1:-1]
+    portfolio_weights = [min_var_weights, max_sharpe_weights]
+
+    for target_return in target_returns:
+        portfolio = efficient_optimization(mean, cov, target_return)['x']
+        portfolio_weights.append(portfolio)
+    return portfolio_weights
+
+
+portfolio_weights = stock_weights(mean_returns,
+                                  cov_matrix)
+# Get a list where table 0 is weights in companies for MVP. Index 9 is weights in companies for Max SR.
+
+
+# Stocks optimal weights of generated sample returns for m portfolios
+def stock_Sample_weights(sample_means, sample_covs):
+    portfolio_weights = []
+    num_samples = len(sample_means)
+    m_portfolios = 10  # checked and no differences between 10 and 30 portfolios
+
+    for i in range(num_samples):
+        mean = sample_means[i]
+        cov = sample_covs[i]
+
+        # Find the minimum variance portfolio weights
+        min_var_portfolio = min_var(mean, cov)
+        min_var_weights = min_var_portfolio['x']
+
+        # Find the maximum Sharpe ratio portfolio weights
+        max_sharpe_portfolio = max_sharpe_ratio(mean, cov)
+        max_sharpe_weights = max_sharpe_portfolio['x']
+
+        # Find the weights of the other x-2 equally spaced portfolios
+        target_returns = np.linspace(port_return(min_var_weights, mean, cov),
+                                     port_return(max_sharpe_weights, mean, cov),
+                                     m_portfolios)[1:-1]
+        sample_portfolio_weights = [min_var_weights, max_sharpe_weights]
+
+        for target_return in target_returns:
+            portfolio = efficient_optimization(mean, cov, target_return)['x']
+            sample_portfolio_weights.append(portfolio)
+
+        portfolio_weights.append(sample_portfolio_weights)
+
+    return portfolio_weights
+
+
+portfolio_weights = stock_Sample_weights(sample_means, sample_covs)
+
+# Create an array containing average between sample weights for each entreprise and portfolio.
+num_portfolios = len(portfolio_weights[0])
+
+# Initialization of an array to store average weights
+mean_weights = np.zeros((num_portfolios, len(portfolio_weights[0][0])))
+
+for i in range(num_portfolios):
+    # Loop over companies
+    for j in range(len(portfolio_weights[0][i])):
+        # Calculation of average weights for company j and portfolio i
+        weights_j_i = [portfolio_weights[k][i][j] for k in range(len(portfolio_weights))]
+        mean_weights[i][j] = np.mean(weights_j_i)
+
+# Create an array containing returns and volatility of averaged samples for different portfolios.
+resampled_port_perf = []
+for i in range(0, len(mean_weights)):
+    resampled_port_perf.append(portfolio_perf(mean_weights[i], mean_returns, cov_matrix))
+
+resampled_port_perf = np.array(resampled_port_perf)
+
+# Sort from lowest return to highest returns
+# Sorting index in relation to column 0
+sort_index = np.argsort(resampled_port_perf[:, 0])
+# Table sorted by column 0
+resampled_port_perf = resampled_port_perf[sort_index]
+
+"PLOT SINGLE EFFICIENT FRONTIER OF A WEIGHTED PORTFOLIO OF ALL SAMPLED PORTFOLIOS"
+plt.figure(figsize=(7, 5))
+# Max SR
+plt.scatter(np.max(resampled_port_perf[:, 1]) * 100, np.max(resampled_port_perf[:, 0]) * 100, color='red', s=100,
+            edgecolors='black')  # *100 to get in %
+# Min Vol
+plt.scatter(np.min(resampled_port_perf[:, 1]) * 100, np.min(resampled_port_perf[:, 0]) * 100, color='green', s=100,
+            edgecolors='black')  # *100 to get in %
+
+plt.plot(resampled_port_perf[:, 1] * 100, resampled_port_perf[:, 0] * 100, color='blue', linestyle='-',
+         linewidth=2)  # *100 to get in %
+plt.ylim(0, 60)
+plt.xlim(0, 10)
+plt.title('Resampled Portfolio Efficient Frontier ')
+plt.xlabel('Annualized Volatility (%)')
+plt.ylabel('Annualized Return (%)')
+plt.legend(['Maximum Sharpe Ratio Portfolio', 'Minimum Variance Portfolio', 'Efficient Frontier'], loc='best')
+
+plt.show()
+
+############################################################################################
+"PLOT ALL EFFICIENT FRONTIERS TOGETHER"
+
+
+def combined_graph(mean_returns, cov_matrix, sample_means, sample_covs, rf=0, constraint_set=(-1, 1)):
+    # Create a figure with 3 subplots
+    fig, axs = plt.subplots(1, 2, figsize=(16, 5))  # 16,6
+
+    # First subplot: Efficient Frontier for mean_returns and cov_matrix
+    max_sr_returns, max_sr_std, max_sr_allocation, min_vol_returns, min_vol_std, min_vol_allocation, \
+        efficient_list, target_return = calculated_results(mean_returns, cov_matrix, rf, constraint_set)
+    # Max SR
+    axs[0].scatter(max_sr_std, max_sr_returns, color='red', s=100, edgecolors='black')
+    # Min Vol
+    axs[0].scatter(min_vol_std, min_vol_returns, color='green', s=100, edgecolors='black')
+    # Efficient Frontier
+    axs[0].plot([ef_std * 100 for ef_std in efficient_list], [target * 100 for target in target_return],
+                color='black', linestyle='-', linewidth=2)
+
+    # First subplot: Averaged Resampled Efficient Frontier
+    # Max SR
+    plt.scatter(np.max(resampled_port_perf[:, 1]) * 100, np.max(resampled_port_perf[:, 0]) * 100, color='red', s=100,
+                edgecolors='black')  # *100 to get in %
+    # Min Vol
+    plt.scatter(np.min(resampled_port_perf[:, 1]) * 100, np.min(resampled_port_perf[:, 0]) * 100, color='green', s=100,
+                edgecolors='black')  # *100 to get in %
+    axs[0].plot(resampled_port_perf[:, 1] * 100, resampled_port_perf[:, 0] * 100, color='blue', linestyle='-',
+                linewidth=2)  # *100 to get in %
+
+    # Set parameters for plots
+    axs[0].set_ylim(0, 60)
+    axs[0].set_xlim(0, 10)
+    axs[0].set_title('Historical & Resampled Portfolios Efficient Frontiers ')
+    axs[0].set_xlabel('Annualized Volatility (%)')
+    axs[0].set_ylabel('Annualized Return (%)')
+    axs[0].legend(['Maximum Sharpe Ratio Portfolio', 'Minimum Variance Portfolio', 'Efficient Frontier'], loc='best')
+
+    # Second subplot: Efficient Frontier for sample_means and sample_covs
+    for i, (m_returns, cov_mat) in enumerate(zip(sample_means, sample_covs)):
+        max_sr_returns, max_sr_std, max_sr_allocation, min_vol_returns, min_vol_std, min_vol_allocation, \
+            efficient_list, target_return = calculated_results(m_returns, cov_mat, rf, constraint_set)
+        color = plt.cm.get_cmap('tab20')(i)
+        # Max SR
+        # axs[1].scatter(max_sr_std, max_sr_returns, color=color, s=100, edgecolors='black')
+        # Min Vol
+        # axs[1].scatter(min_vol_std, min_vol_returns, color=color, s=100, edgecolors='black')
+        # Efficient Frontier
+        axs[1].plot([ef_std * 100 for ef_std in efficient_list], [target * 100 for target in target_return],
+                    color=color, linestyle='-', linewidth=2)
+
+    # Second subplot: Averaged Resampled Efficient Frontier
+    # Max SR
+    plt.scatter(np.max(resampled_port_perf[:, 1]) * 100, np.max(resampled_port_perf[:, 0]) * 100, color='red', s=100,
+                edgecolors='black')  # *100 to get in %
+    # Min Vol
+    plt.scatter(np.min(resampled_port_perf[:, 1]) * 100, np.min(resampled_port_perf[:, 0]) * 100, color='green', s=100,
+                edgecolors='black')  # *100 to get in %
+    axs[1].plot(resampled_port_perf[:, 1] * 100, resampled_port_perf[:, 0] * 100, color='blue', linestyle='-',
+                linewidth=2)  # *100 to get in %
+
+    # Set parameters for plots
+    axs[1].set_ylim(0, 60)
+    axs[1].set_xlim(0, 10)
+    axs[1].set_title('Samples & Resampled Portfolios Efficient Frontiers')
+    axs[1].set_xlabel('Annualized Volatility (%)')
+    axs[1].set_ylabel('Annualized Return (%)')
+    axs[1].legend(['Maximum Sharpe Ratio Portfolio', 'Minimum Variance Portfolio', 'Efficient Frontier'], loc='best')
+
+    plt.show()
+
+
+combined_graph(mean_returns, cov_matrix, sample_means, sample_covs)
+########################################################################################################################
+
 """
 QUESTION 1.4
 """
